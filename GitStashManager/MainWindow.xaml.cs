@@ -205,11 +205,17 @@ namespace GitStashManager
                         continue;
                     }
 
-                    string branchName = Path.GetFileNameWithoutExtension(file).Replace("_", " ").Replace("^", "/").Split("-")[0];
-                    string stashName = Path.GetFileNameWithoutExtension(file).Replace("_", " ").Split("-")[1];
+                    var branchName = Path.GetFileNameWithoutExtension(file).Replace("_", " ").Replace("^", "/");
+					var stashName = Path.GetFileNameWithoutExtension(file).Replace("_", " ").Replace("^", "/");
+					var index = stashName.LastIndexOf('-');
+					if (index != -1)
+					{
+                        stashName = stashName.Substring(index + 1);
+                        branchName = branchName.Substring(0, index);
+					}
 
-                    // Checkout the branch from origin
-                    powerShell.AddScript($"git checkout {branchName}");
+					// Checkout the branch from origin
+					powerShell.AddScript($"git checkout {branchName}");
 
                     // Pull latest
                     powerShell.AddScript($"git pull");
@@ -217,19 +223,19 @@ namespace GitStashManager
                     if (ThreeWayMerge)
                     {
                         // Apply the patch file using 3 way merge
-                        powerShell.AddScript($"git apply --3way --ignore-space-change --ignore-whitespace {file}");
+                        powerShell.AddScript($"git apply --3way --ignore-space-change --ignore-whitespace \"{file}\"");
                     }
                     else
                     {
                         // Apply the patch file
-                        powerShell.AddScript($"git apply --reject --ignore-space-change --ignore-whitespace {file}");
+                        powerShell.AddScript($"git apply --reject --ignore-space-change --ignore-whitespace \"{file}\"");
                     }
 
                     // Stash the changes and name the stash after the patch file
                     powerShell.AddScript($"git stash push -m \"{stashName}\"");
 
                     // Execute the PowerShell script
-                    await powerShell.InvokeAsync();
+                    powerShell.InvokeAsync().Wait();
 
                     if (powerShell.HadErrors)
                     {
@@ -240,7 +246,7 @@ namespace GitStashManager
                             // Handle errors
                             if (!(error.Exception.Message.Contains("Already on") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("Applied patch")))
                             {
-                                errorMessage = error.Exception.Message;
+                                errorMessage += error.Exception.Message;
                                 hadErrors = true;
                             }
                         }
