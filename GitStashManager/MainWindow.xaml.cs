@@ -205,7 +205,7 @@ namespace GitStashManager
                         continue;
                     }
 
-                    string branchName = Path.GetFileNameWithoutExtension(file).Replace("_", " ").Split("-")[0];
+                    string branchName = Path.GetFileNameWithoutExtension(file).Replace("_", " ").Replace("^", "/").Split("-")[0];
                     string stashName = Path.GetFileNameWithoutExtension(file).Replace("_", " ").Split("-")[1];
 
                     // Checkout the branch from origin
@@ -285,7 +285,7 @@ namespace GitStashManager
             btn3WayImport.IsEnabled = true;
         }
 
-        private void btnExport_Click(object sender, RoutedEventArgs e)
+        private async void btnExport_Click(object sender, RoutedEventArgs e)
         {
             var localRepoPath = RepositoryDropdown.SelectedItem?.ToString();
             if (string.IsNullOrWhiteSpace(localRepoPath))
@@ -305,7 +305,8 @@ namespace GitStashManager
                 // Show the FolderBrowserDialog to the user
                 if (folderBrowser.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    var exportPath = folderBrowser.SelectedPath;
+					btnExport.IsEnabled = false;
+					var exportPath = folderBrowser.SelectedPath;
 
                     using (PowerShell powershell = PowerShell.Create())
                     {
@@ -316,17 +317,15 @@ namespace GitStashManager
                         {
                             try
                             {
-                                var splitSelectedItem = selectedItem?.ToString()?.Split(":");
+                                var splitSelectedItem = selectedItem?.ToString()?.Replace("/", "^").Split(":");
                                 var stashName = splitSelectedItem?[0];
                                 var branchName = splitSelectedItem?[1].Replace(" On ", "");
                                 var patchName = splitSelectedItem?[2].Substring(1).Replace(" ", "_");
 
                                 var patchFilePath = Path.Combine(exportPath, $"{branchName}-{patchName}.patch");
 
-                                powershell.AddScript($@"git checkout {branchName}");
-                                powershell.AddScript(@"git push");
-                                powershell.AddScript($@"git stash show '{stashName}' -p > '{patchFilePath}'");
-                                powershell.Invoke();
+								powershell.AddScript($@"git stash show '{stashName}' -p > ""{patchFilePath}""");
+								await powershell.InvokeAsync();
                             }
                             catch (Exception ex)
                             {
@@ -335,12 +334,58 @@ namespace GitStashManager
                         }
 
                         MessageBox.Show($"Backups saved to: {exportPath}", "Export Complete!", MessageBoxButton.OK, MessageBoxImage.Information);
+                        btnExport.IsEnabled = true;
                     }
                 }
             }
         }
 
-        private async void ScanForGitRepos()
+		private async void btnPush_Click(object sender, RoutedEventArgs e)
+		{
+			var localRepoPath = RepositoryDropdown.SelectedItem?.ToString();
+			if (string.IsNullOrWhiteSpace(localRepoPath))
+			{
+				MessageBox.Show("Please select a repository.", "Error!", MessageBoxButton.OK, MessageBoxImage.Error);
+				return;
+			}
+
+			if (ExportStashListBox.SelectedItems.Count <= 0)
+			{
+				MessageBox.Show("Please ensure that the repo has stashed changes, and one or more items are selected from the list above.", "Invalid Selection!", MessageBoxButton.OK, MessageBoxImage.Warning);
+				return;
+			}
+
+			btnPush.IsEnabled = false;
+
+			using (PowerShell powershell = PowerShell.Create())
+			{
+				// Change from the user folder that PowerShell starts up with to your git repository
+				powershell.AddScript($"cd {localRepoPath}");
+
+				foreach (var selectedItem in ExportStashListBox.SelectedItems)
+				{
+					var splitSelectedItem = selectedItem?.ToString()?.Replace("/", "^").Split(":");
+					var branchName = splitSelectedItem?[1].Replace(" On ", "");
+
+					powershell.AddScript($@"git checkout {branchName}");
+					powershell.AddScript(@"git push");
+				}
+
+				try
+				{
+					await powershell.InvokeAsync();
+				}
+				catch (Exception ex)
+				{
+					MessageBox.Show($"An error occurred: {ex.Message}");
+				}
+
+				MessageBox.Show($"Branches pushed to remote.", "Sucess!", MessageBoxButton.OK, MessageBoxImage.Information);
+				btnPush.IsEnabled = true;
+			}
+		}
+
+		private async void ScanForGitRepos()
         {
             string rootPath = @"C:\";
             List<string> gitDirectories = await FindHiddenGitDirectoriesAsync(rootPath);

@@ -53,11 +53,18 @@
             <!-- Export Stash Tab -->
             <TabItem Header="Export Stash">
                 <Grid>
-                    <!-- Stash List -->
-                    <ListBox x:Name="ExportStashListBox" SelectionMode="Multiple" Margin="10"/>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="*"/>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="Auto"/>
+					</Grid.RowDefinitions>
+					<!-- Stash List -->
+                    <ListBox x:Name="ExportStashListBox" SelectionMode="Multiple" Grid.Row="0" Margin="10"/>
                     <!-- Export Button -->
-                    <Button Content="Export Stashes" Click="btnExport_Click" Margin="10" VerticalAlignment="Bottom"/>
-                </Grid>
+					<Button x:Name="btnExport" Content="Export Stashes" Click="btnExport_Click" Grid.Row="1" Margin="10" VerticalAlignment="Bottom"/>
+					<!-- Push Button -->
+					<Button x:Name="btnPush" Content="Push Branches (recommended)" Click="btnPush_Click" Grid.Row="2" Margin="10, 0, 10, 10" VerticalAlignment="Bottom"/>
+				</Grid>
             </TabItem>
             <!-- Import Stash Tab -->
             <TabItem Header="Import Stash">
