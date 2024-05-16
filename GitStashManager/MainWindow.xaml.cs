@@ -219,9 +219,25 @@ namespace GitStashManager
                         branchName = branchName.Substring(0, index).Split("%")[1];
                     }
 
-					// Checkout the branch
-					powerShell.AddScript($"git checkout -b {branchName.Replace(" ", "")}-{commitHash.Substring(0, 12)} {commitHash}");
+                    // Define variables for branch name and commit hash
+                    var cleanedBranchName = branchName.Replace(" ", "");
+                    var shortCommitHash = commitHash.Substring(0, 12);
+                    var newBranchName = $"{ cleanedBranchName }-{ shortCommitHash}";
 
+                    // Check if the branch exists locally
+                    powerShell.AddScript($@"git checkout {cleanedBranchName}");
+                    await powerShell.InvokeAsync();
+                    foreach (var error in powerShell.Streams.Error)
+                    {
+						// Handle errors
+						if (!(error.Exception.Message.Contains("Already on") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("Applied patch") || error.Exception.Message.Contains("Switched to a new branch") || error.Exception.Message.Contains("whitespace") || error.Exception.Message.Contains("already exists") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("cleanly") || error.Exception.Message.Contains("Switched to branch")))
+						{
+							errorMessage += error.Exception.Message + "\n";
+							hadErrors = true;
+						}
+                    }
+                    powerShell.Commands.Clear();
+                    powerShell.Streams.Error.Clear();
 
                     if (ThreeWayMerge)
                     {
@@ -230,6 +246,31 @@ namespace GitStashManager
                     }
                     else
                     {
+                        // Check if the patch can be applied cleanly
+                        powerShell.AddScript($"git apply --check --ignore-space-change --ignore-whitespace \"{file}\"");
+                        await powerShell.InvokeAsync();
+                        powerShell.Commands.Clear();
+
+                        // Check if the patch application failed
+                        if (powerShell.HadErrors)
+                        {
+                            // Rollback changes and checkout an older version
+                            powerShell.AddScript($"git reset --hard HEAD");
+                            powerShell.AddScript($"git checkout -b {newBranchName} {commitHash}");
+
+							await powerShell.InvokeAsync();
+							
+							// The branch already exists
+							if (powerShell.HadErrors)
+                            {
+								powerShell.Commands.Clear();
+								powerShell.Streams.Error.Clear();
+
+								powerShell.AddScript($"git checkout {newBranchName}");
+							}
+							
+                        }
+
                         // Apply the patch file
                         powerShell.AddScript($"git apply --reject --ignore-space-change --ignore-whitespace \"{file}\"");
                     }
@@ -247,7 +288,7 @@ namespace GitStashManager
                         foreach (var error in powerShell.Streams.Error)
                         {
                             // Handle errors
-                            if (!(error.Exception.Message.Contains("Already on") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("Applied patch") || error.Exception.Message.Contains("Switched to a new branch") || error.Exception.Message.Contains("whitespace") || error.Exception.Message.Contains("already exists")))
+                            if (!(error.Exception.Message.Contains("Already on") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("Applied patch") || error.Exception.Message.Contains("Switched to a new branch") || error.Exception.Message.Contains("whitespace") || error.Exception.Message.Contains("already exists") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("cleanly") || error.Exception.Message.Contains("Switched to branch")))
                             {
                                 errorMessage += error.Exception.Message + "\n";
                                 hadErrors = true;
