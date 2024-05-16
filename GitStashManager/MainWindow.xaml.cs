@@ -195,7 +195,7 @@ namespace GitStashManager
                 powerShell.AddScript($"git fetch origin");
 
                 // Execute the PowerShell script
-                await powerShell.InvokeAsync();
+                //powerShell.Invoke();
 
                 foreach (var patchFile in patchFiles)
                 {
@@ -207,18 +207,18 @@ namespace GitStashManager
 
                     var branchName = Path.GetFileNameWithoutExtension(file).Replace("_", " ").Replace("^", "/");
 					var stashName = Path.GetFileNameWithoutExtension(file).Replace("_", " ").Replace("^", "/");
-					var index = stashName.LastIndexOf('-');
+                    var commitHash = string.Empty;
+                    var index = stashName.LastIndexOf('-');
 					if (index != -1)
 					{
                         stashName = stashName.Substring(index + 1);
-                        branchName = branchName.Substring(0, index);
-					}
+                        commitHash = branchName.Substring(0, index).Split("%")[0];
+                        branchName = branchName.Substring(0, index).Split("%")[1];
+                    }
 
-					// Checkout the branch from origin
-					powerShell.AddScript($"git checkout {branchName}");
+					// Checkout the branch
+					powerShell.AddScript($"git checkout -b {branchName.Replace(" ", "")}2 {commitHash}");
 
-                    // Pull latest
-                    powerShell.AddScript($"git pull");
 
                     if (ThreeWayMerge)
                     {
@@ -235,7 +235,7 @@ namespace GitStashManager
                     powerShell.AddScript($"git stash push -m \"{stashName}\"");
 
                     // Execute the PowerShell script
-                    powerShell.InvokeAsync().Wait();
+                    await powerShell.InvokeAsync();
 
                     if (powerShell.HadErrors)
                     {
@@ -244,9 +244,9 @@ namespace GitStashManager
                         foreach (var error in powerShell.Streams.Error)
                         {
                             // Handle errors
-                            if (!(error.Exception.Message.Contains("Already on") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("Applied patch")))
+                            if (!(error.Exception.Message.Contains("Already on") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("Applied patch") || error.Exception.Message.Contains("Switched to a new branch") || error.Exception.Message.Contains("whitespace")))
                             {
-                                errorMessage += error.Exception.Message;
+                                errorMessage += error.Exception.Message + "\n";
                                 hadErrors = true;
                             }
                         }
@@ -328,9 +328,14 @@ namespace GitStashManager
                                 var branchName = splitSelectedItem?[1].Replace(" On ", "");
                                 var patchName = splitSelectedItem?[2].Substring(1).Replace(" ", "_");
 
-                                var patchFilePath = Path.Combine(exportPath, $"{branchName}-{patchName}.patch");
+                                patchName = patchName.Replace(".", "");
 
-								powershell.AddScript($@"git stash show '{stashName}' -p > ""{patchFilePath}""");
+                                powershell.AddScript($@"git rev-parse '{stashName}^'");
+                                var result = await powershell.InvokeAsync();
+                                var commitHash = result[0];
+
+                                var patchFilePath = Path.Combine(exportPath, $"{commitHash}%{branchName}-{patchName}.patch");
+                                powershell.AddScript($@"git stash show '{stashName}' -p > ""{patchFilePath}""");
 								await powershell.InvokeAsync();
                             }
                             catch (Exception ex)
