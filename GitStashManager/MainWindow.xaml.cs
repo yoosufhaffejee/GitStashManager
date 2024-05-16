@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Management.Automation;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using ComboBox = System.Windows.Controls.ComboBox;
@@ -17,7 +18,7 @@ namespace GitStashManager
         public MainWindow()
         {
             InitializeComponent();
-            repositories = new ObservableCollection<string>();
+			repositories = new ObservableCollection<string>();
             RepositoryDropdown.ItemsSource = repositories;
 
             LoadScanResults();
@@ -182,7 +183,8 @@ namespace GitStashManager
         private async Task ApplyPatchesToRepository(string repoPath, IList patchFiles, bool ThreeWayMerge = false)
         {
             var hadErrors = false;
-            var sucessfullImports = new List<object?>();
+			var errorMessage = string.Empty;
+			var sucessfullImports = new List<object?>();
 
             try
             {
@@ -195,7 +197,8 @@ namespace GitStashManager
                 powerShell.AddScript($"git fetch origin");
 
                 // Execute the PowerShell script
-                //powerShell.Invoke();
+                await powerShell.InvokeAsync();
+                powerShell.Commands.Clear();
 
                 foreach (var patchFile in patchFiles)
                 {
@@ -217,7 +220,7 @@ namespace GitStashManager
                     }
 
 					// Checkout the branch
-					powerShell.AddScript($"git checkout -b {branchName.Replace(" ", "")}2 {commitHash}");
+					powerShell.AddScript($"git checkout -b {branchName.Replace(" ", "")}-{commitHash.Substring(0, 12)} {commitHash}");
 
 
                     if (ThreeWayMerge)
@@ -236,46 +239,63 @@ namespace GitStashManager
 
                     // Execute the PowerShell script
                     await powerShell.InvokeAsync();
+                    powerShell.Commands.Clear();
+
 
                     if (powerShell.HadErrors)
                     {
-                        var errorMessage = string.Empty;
-
                         foreach (var error in powerShell.Streams.Error)
                         {
                             // Handle errors
-                            if (!(error.Exception.Message.Contains("Already on") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("Applied patch") || error.Exception.Message.Contains("Switched to a new branch") || error.Exception.Message.Contains("whitespace")))
+                            if (!(error.Exception.Message.Contains("Already on") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("Applied patch") || error.Exception.Message.Contains("Switched to a new branch") || error.Exception.Message.Contains("whitespace") || error.Exception.Message.Contains("already exists")))
                             {
                                 errorMessage += error.Exception.Message + "\n";
                                 hadErrors = true;
                             }
-                        }
-
-                        if (hadErrors)
-                        {
-                            MessageBox.Show($"{errorMessage}", "Output", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        }
-                        else
-                        {
-                            sucessfullImports.Add(patchFile);
+                            else
+                            {
+								sucessfullImports.Add(patchFile);
+							}
                         }
                     }
                 }
 
-                if(!hadErrors)
+                if(hadErrors)
                 {
-                    foreach (var item in sucessfullImports)
-                    {
-                        if (ThreeWayMerge)
-                        {
-                            Import3WayListBox.Items.Remove(item);
-                        }
-                        else
-                        {
-                            ImportStashListBox.Items.Remove(item);
-                        }
-                    }
-                }
+					MessageBox.Show($"{errorMessage}", "Output", MessageBoxButton.OK, MessageBoxImage.Warning);
+					var root = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "./";
+					string filePath = Path.Combine(root ,"errorLog.txt");
+
+					try
+					{
+						using (StreamWriter writer = new StreamWriter(filePath))
+						{
+							foreach (var line in errorMessage.Split("\n"))
+							{
+								writer.WriteLine(line);
+							}
+						}
+						MessageBox.Show("Errors written to log file!", "Error", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+					}
+					catch (Exception ex)
+					{
+						MessageBox.Show($"Error writing logs: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+					}
+				}
+                else
+                {
+					foreach (var item in sucessfullImports)
+					{
+						if (ThreeWayMerge)
+						{
+							Import3WayListBox.Items.Remove(item);
+						}
+						else
+						{
+							ImportStashListBox.Items.Remove(item);
+						}
+					}
+				}
             }
             catch (Exception ex)
             {
@@ -333,10 +353,12 @@ namespace GitStashManager
                                 powershell.AddScript($@"git rev-parse '{stashName}^'");
                                 var result = await powershell.InvokeAsync();
                                 var commitHash = result[0];
+                                powershell.Commands.Clear();
 
                                 var patchFilePath = Path.Combine(exportPath, $"{commitHash}%{branchName}-{patchName}.patch");
                                 powershell.AddScript($@"git stash show '{stashName}' -p > ""{patchFilePath}""");
 								await powershell.InvokeAsync();
+                                powershell.Commands.Clear();
                             }
                             catch (Exception ex)
                             {
@@ -385,6 +407,7 @@ namespace GitStashManager
 				try
 				{
 					await powershell.InvokeAsync();
+                    powershell.Commands.Clear();
 				}
 				catch (Exception ex)
 				{
@@ -464,7 +487,7 @@ namespace GitStashManager
             }
         }
 
-        private void RepositoryDropdown_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void RepositoryDropdown_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             try
             {
@@ -485,7 +508,7 @@ namespace GitStashManager
                 }
 
                 // Run the git stash list command and capture the output
-                var stashList = GetGitStashList(selectedRepositoryPath);
+                var stashList = await GetGitStashList(selectedRepositoryPath);
 
                 // Add each stash entry to the ListBox
                 foreach (var stash in stashList)
@@ -500,7 +523,7 @@ namespace GitStashManager
             }
         }
 
-        private List<string> GetGitStashList(string repositoryPath)
+        private async Task<List<string>> GetGitStashList(string repositoryPath)
         {
             var stashList = new List<string>();
 
@@ -512,7 +535,7 @@ namespace GitStashManager
                     powershell.AddScript($"cd {repositoryPath}");
                     powershell.AddScript(@"git stash list");
 
-                    Collection<PSObject> results = powershell.Invoke();
+                    var results = await powershell.InvokeAsync();
                     foreach (PSObject obj in results)
                     {
                         stashList.Add(obj.ToString());
