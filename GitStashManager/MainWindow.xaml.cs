@@ -227,16 +227,24 @@ namespace GitStashManager
                     // Check if the branch exists locally
                     powerShell.AddScript($@"git checkout {cleanedBranchName}");
                     await powerShell.InvokeAsync();
-                    foreach (var error in powerShell.Streams.Error)
-                    {
-						// Handle errors
-						if (!(error.Exception.Message.Contains("Already on") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("Applied patch") || error.Exception.Message.Contains("Switched to a new branch") || error.Exception.Message.Contains("whitespace") || error.Exception.Message.Contains("already exists") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("cleanly") || error.Exception.Message.Contains("Switched to branch")))
+
+					bool switchedBranches = false;
+
+					foreach (var error in powerShell.Streams.Error)
+					{
+						if (error.Exception.Message.Contains("Switched to"))
 						{
-							errorMessage += error.Exception.Message + "\n";
-							hadErrors = true;
+							switchedBranches = true;
 						}
-                    }
-                    powerShell.Commands.Clear();
+					}
+
+					// Show error if no "Switched to branch" error is encountered
+					if (!switchedBranches)
+					{
+                        errorMessage += "Branch not found, push branches from the source PC!";
+					}
+
+					powerShell.Commands.Clear();
                     powerShell.Streams.Error.Clear();
 
                     if (ThreeWayMerge)
@@ -254,34 +262,42 @@ namespace GitStashManager
                         // Check if the patch application failed
                         if (powerShell.HadErrors)
                         {
+                            // Clear old errors
+                            powerShell.Streams.Error.Clear();
+
                             // Rollback changes and checkout an older version
                             powerShell.AddScript($"git reset --hard HEAD");
                             powerShell.AddScript($"git checkout -b {newBranchName} {commitHash}");
-
 							await powerShell.InvokeAsync();
 							
-							// The branch already exists
+							// If the branch already exists, it will give an error
 							if (powerShell.HadErrors)
                             {
-								powerShell.Commands.Clear();
-								powerShell.Streams.Error.Clear();
+								foreach (var error in powerShell.Streams.Error)
+								{
+									// Checkout the existing branch
+									if (error.Exception.Message.Contains("already exists"))
+									{
+										powerShell.Commands.Clear();
+										powerShell.Streams.Error.Clear();
+										powerShell.AddScript($"git checkout {newBranchName}");
 
-								powerShell.AddScript($"git checkout {newBranchName}");
+										// Execute the PowerShell script
+										await powerShell.InvokeAsync();
+										powerShell.Commands.Clear();
+                                        powerShell.Streams.Error.Clear();
+									}
+								}
 							}
-							
                         }
 
                         // Apply the patch file
                         powerShell.AddScript($"git apply --reject --ignore-space-change --ignore-whitespace \"{file}\"");
-                    }
 
-                    // Stash the changes and name the stash after the patch file
-                    powerShell.AddScript($"git stash push -m \"{stashName}\"");
-
-                    // Execute the PowerShell script
-                    await powerShell.InvokeAsync();
-                    powerShell.Commands.Clear();
-
+						// Execute the PowerShell script
+						await powerShell.InvokeAsync();
+						powerShell.Commands.Clear();
+					}
 
                     if (powerShell.HadErrors)
                     {
@@ -299,7 +315,14 @@ namespace GitStashManager
 							}
                         }
                     }
-                }
+
+					// Stash the changes and name the stash after the patch file
+					powerShell.AddScript($"git stash push -u -m \"{stashName}\"");
+
+					// Execute the PowerShell script
+					await powerShell.InvokeAsync();
+					powerShell.Commands.Clear();
+				}
 
                 if(hadErrors)
                 {
