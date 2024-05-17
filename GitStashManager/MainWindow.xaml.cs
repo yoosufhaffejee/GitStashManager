@@ -288,7 +288,7 @@ namespace GitStashManager
                         foreach (var error in powerShell.Streams.Error)
                         {
                             // Handle errors
-                            if (!(error.Exception.Message.Contains("Already on") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("Applied patch") || error.Exception.Message.Contains("Switched to a new branch") || error.Exception.Message.Contains("whitespace") || error.Exception.Message.Contains("already exists") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("cleanly") || error.Exception.Message.Contains("Switched to branch")))
+                            if (!(error.Exception.Message.Contains("Already on") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("Applied patch") || error.Exception.Message.Contains("Switched to a new branch") || error.Exception.Message.Contains("whitespace") || error.Exception.Message.Contains("already exists") || error.Exception.Message.Contains("Checking patch") || error.Exception.Message.Contains("cleanly") || error.Exception.Message.Contains("Switched to branch") || error.Exception.Message.Contains("From")))
                             {
                                 errorMessage += error.Exception.Message + "\n";
                                 hadErrors = true;
