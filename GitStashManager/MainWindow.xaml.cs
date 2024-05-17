@@ -67,7 +67,6 @@ namespace GitStashManager
                             repositories.Add(line);
                         }
                     }
-                    //MessageBox.Show("Scan results loaded successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else
                 {
@@ -83,7 +82,15 @@ namespace GitStashManager
 
         private void btnAddDir_Click(object sender, RoutedEventArgs e)
         {
-            repositories.Add(txtDirectory.Text);
+            if (!string.IsNullOrWhiteSpace(txtDirectory.Text) && Path.Exists(txtDirectory.Text) && repositories.Any(_ => _ == txtDirectory.Text))
+            {
+                repositories.Add(txtDirectory.Text);
+                SaveScanResults();
+            }
+            else
+            {
+                MessageBox.Show("Invalid or Duplicate Directory!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void btnSelectFolder_Click(object sender, RoutedEventArgs e)
@@ -464,7 +471,7 @@ namespace GitStashManager
 
 			if (ExportStashListBox.SelectedItems.Count <= 0)
 			{
-				MessageBox.Show("Please ensure that the repo has stashed changes, and one or more items are selected from the list above.", "Invalid Selection!", MessageBoxButton.OK, MessageBoxImage.Warning);
+				MessageBox.Show("Please ensure that the repo has stashed changes, and one or more items are selected from the list above. The branches to be pushed will be determined via the stash.", "Invalid Selection!", MessageBoxButton.OK, MessageBoxImage.Warning);
 				return;
 			}
 
@@ -480,8 +487,7 @@ namespace GitStashManager
 					var splitSelectedItem = selectedItem?.ToString()?.Replace("/", "^").Split(":");
 					var branchName = splitSelectedItem?[1].Replace(" On ", "");
 
-					powershell.AddScript($@"git checkout {branchName}");
-					powershell.AddScript(@"git push");
+					powershell.AddScript($@"git push origin {branchName}");
 				}
 
 				try
