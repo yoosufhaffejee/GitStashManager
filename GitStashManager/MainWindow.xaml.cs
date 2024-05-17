@@ -191,6 +191,7 @@ namespace GitStashManager
         {
             var hadErrors = false;
 			var errorMessage = string.Empty;
+			var warningMessage = string.Empty;
 			var sucessfullImports = new List<object?>();
 
             try
@@ -251,8 +252,8 @@ namespace GitStashManager
 					// Show error if no "Switched to branch" error is encountered
 					if (!switchedBranches)
 					{
-                        errorMessage += "Branch not found, push branches from the source PC!";
-					}
+                        warningMessage += "Branch not found, push branches from the source PC!";
+					}  
 
 					powerShell.Commands.Clear();
                     powerShell.Streams.Error.Clear();
@@ -393,6 +394,10 @@ namespace GitStashManager
             {
                 MessageBox.Show("Patches applied and changes stashed successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
+            //else if (string.IsNullOrWhiteSpace(warningMessage))
+            //{
+				//MessageBox.Show($"Patches applied with warnings: {warningMessage}", "Succeeds with warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+			//}
 
             btnImport.IsEnabled = true;
             btn3WayImport.IsEnabled = true;
