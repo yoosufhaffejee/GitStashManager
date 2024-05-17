@@ -86,7 +86,7 @@
                 </Grid>
             </TabItem>
             <!-- Import Stash Tab -->
-            <TabItem Header="Import Stash (3 Way Merge)">
+            <TabItem Header="Apply Patch (3 Way Merge)">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
