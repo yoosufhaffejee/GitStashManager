@@ -211,6 +211,7 @@ namespace GitStashManager
                     var branchName = Path.GetFileNameWithoutExtension(file).Replace("_", " ").Replace("^", "/");
 					var stashName = Path.GetFileNameWithoutExtension(file).Replace("_", " ").Replace("^", "/");
                     var commitHash = string.Empty;
+
                     var index = stashName.LastIndexOf('-');
 					if (index != -1)
 					{
@@ -223,6 +224,8 @@ namespace GitStashManager
                     var cleanedBranchName = branchName.Replace(" ", "");
                     var shortCommitHash = commitHash.Substring(0, 12);
                     var newBranchName = $"{ cleanedBranchName }-{ shortCommitHash}";
+
+                    var deleteBranch = false;
 
                     // Check if the branch exists locally
                     powerShell.AddScript($@"git checkout {cleanedBranchName}");
@@ -289,6 +292,9 @@ namespace GitStashManager
 									}
 								}
 							}
+
+                            // We need to delete the new branch after applying the stash
+                            deleteBranch = true;
                         }
 
                         // Apply the patch file
@@ -322,7 +328,17 @@ namespace GitStashManager
 					// Execute the PowerShell script
 					await powerShell.InvokeAsync();
 					powerShell.Commands.Clear();
-				}
+
+                    if (deleteBranch)
+                    {
+                        // Delete the branch
+                        powerShell.AddScript($"git branch -D \"{newBranchName}\"");
+
+                        // Execute the PowerShell script
+                        await powerShell.InvokeAsync();
+                        powerShell.Commands.Clear();
+                    }
+                }
 
                 if(hadErrors)
                 {
