@@ -342,6 +342,13 @@ namespace GitStashManager
 
                     if (deleteBranch)
                     {
+                        // Change branch
+                        powerShell.AddScript($"git checkout master");
+
+                        // Execute the PowerShell script
+                        await powerShell.InvokeAsync();
+                        powerShell.Commands.Clear();
+
                         // Delete the branch
                         powerShell.AddScript($"git branch -D \"{newBranchName}\"");
 
