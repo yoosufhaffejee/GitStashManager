@@ -10,7 +10,6 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -26,26 +25,17 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            
-            <!-- Repository Dropdown -->
-            <ComboBox x:Name="RepositoryDropdown" Grid.Column="0" Margin="0,0,5,0" VerticalAlignment="Center" SelectionChanged="RepositoryDropdown_SelectionChanged" />
-
-            <!-- Scan Button -->
-            <Button x:Name="btnScan" Content="Rescan" Click="btnScan_Click" Grid.Column="1" Margin="0"/>
-        </Grid>
-
-        <Grid Grid.Row="2" Margin="10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <!-- Repository Dropdown -->
-            <TextBox x:Name="txtDirectory" Text="Enter Repository Path..." Grid.Column="0" Margin="0,0,5,0" VerticalAlignment="Center" />
-            
+            <ComboBox x:Name="RepositoryDropdown" Grid.Column="0" Margin="0,0,5,0" VerticalAlignment="Center" SelectionChanged="RepositoryDropdown_SelectionChanged" />
+
+            <!-- Scan Button -->
+            <Button x:Name="btnScan" Content="Rescan" Click="btnScan_Click" Grid.Column="1" Margin="0,0,5,0"/>
+
             <!-- Directory Button -->
-            <Button Content="Add Repo" Click="btnAddDir_Click" Grid.Column="1" Margin="0"/>
+            <Button Content="Select Folder" Click="btnAddDir_Click" Grid.Column="2" Margin="0,0,5,0"/>
         </Grid>
 
         <!-- Tab Control -->

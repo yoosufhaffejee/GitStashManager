@@ -82,14 +82,33 @@ namespace GitStashManager
 
         private void btnAddDir_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrWhiteSpace(txtDirectory.Text) && Path.Exists(txtDirectory.Text) && repositories.Any(_ => _ == txtDirectory.Text))
+            var folderBrowserDialog = new FolderBrowserDialog();
+            folderBrowserDialog.Description = "Select the repository root directory";
+            folderBrowserDialog.UseDescriptionForTitle = true;
+
+            DialogResult result = folderBrowserDialog.ShowDialog();
+            if (result == System.Windows.Forms.DialogResult.OK && !string.IsNullOrWhiteSpace(folderBrowserDialog.SelectedPath))
             {
-                repositories.Add(txtDirectory.Text);
-                SaveScanResults();
-            }
-            else
-            {
-                MessageBox.Show("Invalid or Duplicate Directory!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                string selectedFolderPath = folderBrowserDialog.SelectedPath + '\\';
+                string gitDirectoryPath = Path.Combine(selectedFolderPath, ".git");
+
+                if (Directory.Exists(gitDirectoryPath))
+                {
+                    if (repositories.Any(repo => repo.Equals(selectedFolderPath, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        MessageBox.Show("The selected repository already exists in the list.", "Duplicate Repository", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    else
+                    {
+                        repositories.Add(selectedFolderPath);
+                        RepositoryDropdown.SelectedItem = selectedFolderPath;
+                        MessageBox.Show("Repository added successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("The selected folder does not contain a .git directory.", "Invalid Repository", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -542,8 +561,13 @@ namespace GitStashManager
             return gitDirectories;
         }
 
-        static async Task SearchDirectoriesAsync(string rootPath, List<string> gitDirectories)
+        static async Task SearchDirectoriesAsync(string rootPath, List<string> gitDirectories, int currentDepth = 0, int maxDepth = 5)
         {
+            if (currentDepth > maxDepth)
+            {
+                return;
+            }
+
             try
             {
                 var directories = Directory.GetDirectories(rootPath);
@@ -563,8 +587,8 @@ namespace GitStashManager
                                     gitDirectories.Add(directoryInfo.FullName);
                                 }
                             }
-                            // Recursively search within the current directory
-                            await SearchDirectoriesAsync(dir, gitDirectories);
+                            // Recursively search within the current directory with increased depth
+                            await SearchDirectoriesAsync(dir, gitDirectories, currentDepth + 1, maxDepth);
                         }
                         catch (UnauthorizedAccessException)
                         {
